@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PDF to JPG Converter</title>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Local PDF export</p>
+          <h1>PDF to JPG Converter</h1>
+        </div>
+        <button class="icon-button" id="themeButton" type="button" title="Toggle theme" aria-label="Toggle theme">
+          <span id="themeIcon">S</span>
+        </button>
+      </header>
+
+      <section class="panel">
+        <div class="setting-row">
+          <div>
+            <label for="quality">JPG quality</label>
+            <span class="hint">Sharper images create larger files</span>
+          </div>
+          <strong id="qualityValue">92</strong>
+        </div>
+        <input id="quality" type="range" min="50" max="100" step="1" value="92" />
+
+        <div class="setting-block">
+          <label>Resolution scale</label>
+          <div class="segments" role="radiogroup" aria-label="Resolution scale">
+            <button type="button" class="segment" data-scale="1">1x</button>
+            <button type="button" class="segment" data-scale="1.5">1.5x</button>
+            <button type="button" class="segment is-active" data-scale="2">2x</button>
+            <button type="button" class="segment" data-scale="3">3x</button>
+          </div>
+        </div>
+
+        <div class="toggle-row">
+          <div>
+            <label for="zipMode">ZIP export</label>
+            <span class="hint">One ZIP containing the output folder</span>
+          </div>
+          <button id="zipMode" class="toggle" type="button" role="switch" aria-checked="false">
+            <span></span>
+          </button>
+        </div>
+      </section>
+
+      <section class="progress-card" id="progressCard" aria-live="polite">
+        <div class="progress-meta">
+          <span id="statusText">Ready to convert the active PDF tab</span>
+          <span id="pageCounter">0 / 0</span>
+        </div>
+        <div class="progress-track">
+          <div id="progressBar" class="progress-bar"></div>
+        </div>
+        <div class="stats">
+          <span id="eta">ETA --</span>
+          <span id="folderName">Folder auto-named from PDF</span>
+        </div>
+      </section>
+
+      <footer class="actions">
+        <button id="cancelButton" class="secondary" type="button" disabled aria-label="Cancel conversion">Cancel</button>
+        <button id="convertButton" class="primary" type="button" aria-label="Convert active PDF">Convert</button>
+      </footer>
+    </main>
+    <script type="module" src="./popup.ts"></script>
+  </body>
+</html>

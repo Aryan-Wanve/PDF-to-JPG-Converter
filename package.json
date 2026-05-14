@@ -1,0 +1,26 @@
+{
+  "name": "pdf-to-jpg-converter",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Chrome Extension that converts the active PDF tab into JPG images locally in the browser.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "typecheck": "tsc --noEmit",
+    "build": "npm run icons && tsc --noEmit && vite build && npm run copy:assets",
+    "copy:assets": "node scripts/copy-static-assets.mjs",
+    "icons": "powershell -ExecutionPolicy Bypass -File scripts/generate-icons.ps1",
+    "package": "npm run build && node scripts/package-extension.mjs",
+    "clean": "node scripts/clean.mjs"
+  },
+  "dependencies": {
+    "pdfjs-dist": "^4.10.38",
+    "vite": "^6.0.7"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.287",
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2",
+    "yazl": "^3.3.1"
+  }
+}
