@@ -20,7 +20,7 @@
     "type": "module"
   },
   "permissions": ["activeTab", "downloads", "storage", "scripting", "offscreen"],
-  "optional_host_permissions": ["<all_urls>"],
+  "host_permissions": ["<all_urls>"],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
   }
