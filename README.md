@@ -22,6 +22,7 @@ Version: `1.0.0`
 ```powershell
 npm install
 npm run icons
+npm run store-assets
 npm run build
 ```
 
@@ -41,11 +42,22 @@ npm run package
 
 The upload artifact is written to `release/pdf-to-jpg-converter-v1.0.0.zip`.
 
+Listing assets and dashboard copy can be bundled separately with:
+
+```powershell
+npm run package:store-assets
+```
+
+That creates `release/chrome-web-store-assets-v1.0.0.zip`.
+
 ## Build Scripts
 
 - `npm run typecheck`: validates the TypeScript source.
-- `npm run build`: generates icons, typechecks, builds with Vite, copies static assets, and sanitizes pdf.js eval probes for MV3 CSP compliance.
+- `npm run icons`: generates extension icons.
+- `npm run store-assets`: generates Chrome Web Store screenshots and promo images.
+- `npm run build`: generates icons/store assets, typechecks, builds with Vite, copies static assets, and sanitizes pdf.js eval probes for MV3 CSP compliance.
 - `npm run package`: rebuilds and creates the Chrome Web Store upload ZIP.
+- `npm run package:store-assets`: creates a ZIP containing store listing graphics and dashboard copy.
 - `npm run clean`: removes generated `dist` and `release` output.
 
 ## Usage
@@ -81,8 +93,10 @@ The repository includes:
 - Manifest V3 extension source and production build output.
 - Required icon sizes: 16, 32, 48, and 128 px.
 - Privacy policy, store listing copy, release notes, edge-case documentation, and performance notes.
-- Screenshot and promotional image placeholders under `store-assets`.
+- Upload-ready screenshots and promotional images under `store-assets`.
 - Ready-to-upload ZIP under `release`.
+- Chrome Web Store submission checklist in `CHROME_WEB_STORE_SUBMISSION.md`.
+- Dashboard-ready listing and privacy answers in `STORE_LISTING.md`.
 
 ## Troubleshooting
 
