@@ -116,8 +116,20 @@ function renderStatus(status: JobStatus): void {
   progressCard.dataset.state = status.state;
 
   if (status.state === "running") {
-    const phase = status.phase === "zipping" ? "Creating ZIP" : status.phase === "loading" ? "Loading PDF" : "Rendering pages";
-    statusText.textContent = `${phase}${total ? ` (${percent}%)` : ""}`;
+    const phase =
+      status.detail ??
+      (status.phase === "zipping"
+        ? "Creating ZIP"
+        : status.phase === "loading"
+          ? "Loading PDF"
+          : status.phase === "encoding"
+            ? "Encoding JPG"
+            : status.phase === "saving"
+              ? "Saving output"
+              : status.phase === "preparing"
+                ? "Preparing page"
+                : "Rendering pages");
+    statusText.textContent = `${phase}${total && !status.detail ? ` (${percent}%)` : ""}`;
     return;
   }
 

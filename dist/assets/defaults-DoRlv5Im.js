@@ -1,0 +1,1 @@
+const e={quality:92,scale:2,zipMode:!1,theme:"system"},l={jobId:null,state:"idle",sourceName:null,folderName:null,currentPage:0,totalPages:0,phase:null,detail:null,etaMs:null,elapsedMs:0,error:null,zipMode:!1},s="pdfToJpgSettings";export{e as D,l as I,s as S};

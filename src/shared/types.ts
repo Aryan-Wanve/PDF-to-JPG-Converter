@@ -57,11 +57,12 @@ export interface DownloadZipMessage {
 export interface ProgressMessage {
   type: "CONVERSION_PROGRESS";
   jobId: string;
-  phase: "loading" | "rendering" | "zipping" | "downloading";
+  phase: "loading" | "preparing" | "rendering" | "encoding" | "saving" | "zipping" | "downloading";
   currentPage: number;
   totalPages: number;
   elapsedMs: number;
   etaMs: number | null;
+  detail?: string;
 }
 
 export interface CompletedMessage {
@@ -98,6 +99,7 @@ export interface JobStatus {
   currentPage: number;
   totalPages: number;
   phase: ProgressMessage["phase"] | null;
+  detail: string | null;
   etaMs: number | null;
   elapsedMs: number;
   error: string | null;

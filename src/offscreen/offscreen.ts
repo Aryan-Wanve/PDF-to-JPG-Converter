@@ -7,7 +7,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL("assets/pdf.worke
 
 const cancelledJobs = new Set<string>();
 const PDF_FETCH_TIMEOUT_MS = 30000;
-const PAGE_RENDER_TIMEOUT_MS = 90000;
+const PAGE_STEP_TIMEOUT_MS = 30000;
 
 chrome.runtime.onMessage.addListener((message: RuntimeMessage) => {
   if (message.type === "OFFSCREEN_START") {
@@ -28,7 +28,7 @@ async function convertPdf(message: OffscreenStartMessage): Promise<void> {
 
   try {
     cancelledJobs.delete(jobId);
-    postProgress(jobId, "loading", 0, 0, startedAt);
+    postProgress(jobId, "loading", 0, 0, startedAt, "Reading PDF");
 
     let pdf: pdfjsLib.PDFDocumentProxy | null = null;
     const pdfBytes = await fetchPdfBytes(source.url);
@@ -39,18 +39,21 @@ async function convertPdf(message: OffscreenStartMessage): Promise<void> {
       useWorkerFetch: false,
       isEvalSupported: false,
       isOffscreenCanvasSupported: false,
-      isImageDecoderSupported: false
+      isImageDecoderSupported: false,
+      disableFontFace: true,
+      stopAtErrors: true
     }).promise;
     const totalPages = pdf.numPages;
     const zipEntries: ZipEntry[] | null = settings.zipMode ? [] : null;
 
     for (let pageNumber = 1; pageNumber <= totalPages; pageNumber += 1) {
       ensureNotCancelled(jobId);
-      postProgress(jobId, "rendering", pageNumber, totalPages, startedAt);
+      postProgress(jobId, "preparing", pageNumber - 1, totalPages, startedAt, `Preparing page ${pageNumber} of ${totalPages}`);
 
-      const jpgDataUrl = await renderPageToJpg(pdf, pageNumber, settings.scale, settings.quality / 100);
+      const jpgDataUrl = await renderPageToJpg(pdf, jobId, pageNumber, totalPages, settings.scale, settings.quality / 100, startedAt);
       const jpgName = pageFilename(pageNumber);
 
+      postProgress(jobId, "saving", pageNumber - 1, totalPages, startedAt, `Saving page ${pageNumber} of ${totalPages}`);
       if (zipEntries) {
         zipEntries.push({
           path: `${source.folderName}/${jpgName}`,
@@ -65,12 +68,13 @@ async function convertPdf(message: OffscreenStartMessage): Promise<void> {
         });
       }
 
+      postProgress(jobId, "rendering", pageNumber, totalPages, startedAt, `Finished page ${pageNumber} of ${totalPages}`);
       await yieldToBrowser();
     }
 
     if (zipEntries) {
       ensureNotCancelled(jobId);
-      postProgress(jobId, "zipping", totalPages, totalPages, startedAt);
+      postProgress(jobId, "zipping", totalPages, totalPages, startedAt, "Creating ZIP");
       const zipBlob = createZipBlob(zipEntries);
       const zipDataUrl = await blobToDataUrl(zipBlob);
       await chrome.runtime.sendMessage({
@@ -132,16 +136,26 @@ async function fetchPdfBytes(url: string): Promise<ArrayBuffer> {
 
 async function renderPageToJpg(
   pdf: pdfjsLib.PDFDocumentProxy,
+  jobId: string,
   pageNumber: number,
+  totalPages: number,
   scale: number,
-  quality: number
+  quality: number,
+  startedAt: number
 ): Promise<string> {
-  const page = await pdf.getPage(pageNumber);
+  const page = await withTimeout(
+    pdf.getPage(pageNumber),
+    PAGE_STEP_TIMEOUT_MS,
+    () => undefined,
+    `Preparing page ${pageNumber} timed out. Try reopening the PDF tab and converting again.`
+  );
   const viewport = page.getViewport({ scale });
 
   const canvas = document.createElement("canvas");
   canvas.width = Math.ceil(viewport.width);
   canvas.height = Math.ceil(viewport.height);
+  canvas.hidden = true;
+  document.body.append(canvas);
 
   const context = canvas.getContext("2d", { alpha: false });
   if (!context) throw new Error("Chrome could not create a rendering canvas.");
@@ -149,29 +163,45 @@ async function renderPageToJpg(
   context.fillStyle = "#ffffff";
   context.fillRect(0, 0, canvas.width, canvas.height);
 
-  const renderTask = page.render({
-    canvasContext: context as CanvasRenderingContext2D,
-    viewport
-  });
-
   try {
+    postProgress(jobId, "rendering", pageNumber - 1, totalPages, startedAt, `Rendering page ${pageNumber} of ${totalPages}`);
+    const renderTask = page.render({
+      canvasContext: context,
+      viewport,
+      intent: "print",
+      annotationMode: pdfjsLib.AnnotationMode.DISABLE
+    });
+    renderTask.onContinue = (continueCallback: () => void) => {
+      window.setTimeout(continueCallback, 0);
+    };
+
     await withTimeout(
       renderTask.promise,
-      PAGE_RENDER_TIMEOUT_MS,
+      PAGE_STEP_TIMEOUT_MS,
       () => renderTask.cancel(),
       `Rendering page ${pageNumber} timed out. Try 1x scale, then reopen the PDF tab and convert again.`
     );
+
+    postProgress(jobId, "encoding", pageNumber - 1, totalPages, startedAt, `Encoding page ${pageNumber} of ${totalPages}`);
+    const blob = await withTimeout(
+      htmlCanvasToBlob(canvas, quality),
+      PAGE_STEP_TIMEOUT_MS,
+      () => undefined,
+      `Encoding page ${pageNumber} timed out. Try a lower resolution scale.`
+    );
+
+    return await withTimeout(
+      blobToDataUrl(blob),
+      PAGE_STEP_TIMEOUT_MS,
+      () => undefined,
+      `Preparing download data for page ${pageNumber} timed out.`
+    );
   } finally {
     page.cleanup();
+    canvas.remove();
+    canvas.width = 0;
+    canvas.height = 0;
   }
-
-
-  const blob = await htmlCanvasToBlob(canvas, quality);
-
-  canvas.width = 0;
-  canvas.height = 0;
-
-  return blobToDataUrl(blob);
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, onTimeout: () => void, message: string): Promise<T> {
@@ -228,14 +258,15 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 
 function postProgress(
   jobId: string,
-  phase: "loading" | "rendering" | "zipping" | "downloading",
+  phase: "loading" | "preparing" | "rendering" | "encoding" | "saving" | "zipping" | "downloading",
   currentPage: number,
   totalPages: number,
-  startedAt: number
+  startedAt: number,
+  detail?: string
 ): void {
   const elapsedMs = performance.now() - startedAt;
   const etaMs = currentPage > 0 && totalPages > 0 ? (elapsedMs / currentPage) * (totalPages - currentPage) : null;
-  void chrome.runtime.sendMessage({ type: "CONVERSION_PROGRESS", jobId, phase, currentPage, totalPages, elapsedMs, etaMs });
+  void chrome.runtime.sendMessage({ type: "CONVERSION_PROGRESS", jobId, phase, currentPage, totalPages, elapsedMs, etaMs, detail });
 }
 
 function ensureNotCancelled(jobId: string): void {

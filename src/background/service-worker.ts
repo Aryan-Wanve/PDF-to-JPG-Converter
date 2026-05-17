@@ -182,6 +182,7 @@ function publishProgress(message: ProgressMessage): void {
   status = {
     ...status,
     phase: message.phase,
+    detail: message.detail ?? null,
     currentPage: message.currentPage,
     totalPages: message.totalPages,
     elapsedMs: message.elapsedMs,

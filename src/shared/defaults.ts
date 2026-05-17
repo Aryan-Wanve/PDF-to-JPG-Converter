@@ -15,6 +15,7 @@ export const IDLE_STATUS: JobStatus = {
   currentPage: 0,
   totalPages: 0,
   phase: null,
+  detail: null,
   etaMs: null,
   elapsedMs: 0,
   error: null,
