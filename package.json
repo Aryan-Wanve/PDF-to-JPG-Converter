@@ -7,9 +7,11 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "typecheck": "tsc --noEmit",
-    "build": "npm run icons && tsc --noEmit && vite build && npm run copy:assets",
+    "build": "npm run icons && npm run store-assets && tsc --noEmit && vite build && npm run copy:assets",
     "copy:assets": "node scripts/copy-static-assets.mjs",
     "icons": "powershell -ExecutionPolicy Bypass -File scripts/generate-icons.ps1",
+    "store-assets": "powershell -ExecutionPolicy Bypass -File scripts/generate-store-assets.ps1",
+    "package:store-assets": "npm run icons && npm run store-assets && node scripts/package-store-assets.mjs",
     "package": "npm run build && node scripts/package-extension.mjs",
     "clean": "node scripts/clean.mjs"
   },

@@ -20,10 +20,6 @@ if (existsSync(join(root, "icons"))) {
   await cp(join(root, "icons"), join(dist, "icons"), { recursive: true });
 }
 
-if (existsSync(join(root, "store-assets"))) {
-  await cp(join(root, "store-assets"), join(dist, "store-assets"), { recursive: true });
-}
-
 await copyIntoDist(
   join(root, "node_modules", "pdfjs-dist", "build", "pdf.worker.min.mjs"),
   join(dist, "assets", "pdf.worker.min.mjs")
