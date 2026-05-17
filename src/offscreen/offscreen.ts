@@ -6,6 +6,8 @@ import { createZipBlob, type ZipEntry } from "./zip";
 pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL("assets/pdf.worker.min.mjs");
 
 const cancelledJobs = new Set<string>();
+const PDF_FETCH_TIMEOUT_MS = 30000;
+const PAGE_RENDER_TIMEOUT_MS = 90000;
 
 chrome.runtime.onMessage.addListener((message: RuntimeMessage) => {
   if (message.type === "OFFSCREEN_START") {
@@ -28,10 +30,11 @@ async function convertPdf(message: OffscreenStartMessage): Promise<void> {
     cancelledJobs.delete(jobId);
     postProgress(jobId, "loading", 0, 0, startedAt);
 
+    let pdf: pdfjsLib.PDFDocumentProxy | null = null;
     const pdfBytes = await fetchPdfBytes(source.url);
     ensureNotCancelled(jobId);
 
-    const pdf = await pdfjsLib.getDocument({ data: pdfBytes, useWorkerFetch: false, isEvalSupported: false }).promise;
+    pdf = await pdfjsLib.getDocument({ data: pdfBytes, useWorkerFetch: false, isEvalSupported: false }).promise;
     const totalPages = pdf.numPages;
     const zipEntries: ZipEntry[] | null = settings.zipMode ? [] : null;
 
@@ -96,7 +99,26 @@ async function convertPdf(message: OffscreenStartMessage): Promise<void> {
 }
 
 async function fetchPdfBytes(url: string): Promise<ArrayBuffer> {
-  const response = await fetch(url, { credentials: "include", cache: "no-store" });
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), PDF_FETCH_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(url, { credentials: "include", cache: "no-store", signal: controller.signal });
+  } catch (error) {
+    if (url.startsWith("file:")) {
+      throw new Error(
+        "Chrome could not read this local PDF. Enable Allow access to file URLs for the extension in chrome://extensions, reload the PDF tab, and try again."
+      );
+    }
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("Chrome timed out while reading the PDF. Try reopening the PDF tab and converting again.");
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+
   if (!response.ok) {
     throw new Error(`Chrome could not read the PDF (${response.status}). Try a direct PDF URL or allow file URL access.`);
   }
@@ -126,12 +148,22 @@ async function renderPageToJpg(
   context.fillStyle = "#ffffff";
   context.fillRect(0, 0, canvas.width, canvas.height);
 
-  await page.render({
+  const renderTask = page.render({
     canvasContext: context as CanvasRenderingContext2D,
     viewport
-  }).promise;
+  });
 
-  page.cleanup();
+  try {
+    await withTimeout(
+      renderTask.promise,
+      PAGE_RENDER_TIMEOUT_MS,
+      () => renderTask.cancel(),
+      `Rendering page ${pageNumber} timed out. Try 1x scale, then reopen the PDF tab and convert again.`
+    );
+  } finally {
+    page.cleanup();
+  }
+
 
   const blob =
     canvas instanceof OffscreenCanvas
@@ -142,6 +174,26 @@ async function renderPageToJpg(
   canvas.height = 0;
 
   return blobToDataUrl(blob);
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, onTimeout: () => void, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeoutId = window.setTimeout(() => {
+      onTimeout();
+      reject(new Error(message));
+    }, timeoutMs);
+
+    promise.then(
+      (value) => {
+        window.clearTimeout(timeoutId);
+        resolve(value);
+      },
+      (error: unknown) => {
+        window.clearTimeout(timeoutId);
+        reject(error);
+      }
+    );
+  });
 }
 
 function htmlCanvasToBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {

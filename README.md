@@ -27,7 +27,7 @@ npm run build
 
 Then open `chrome://extensions`, enable Developer mode, choose **Load unpacked**, and select the `dist` folder.
 
-For local `file://` PDFs, open the extension details in Chrome and enable **Allow access to file URLs**.
+For local `file://` PDFs, open the extension details in Chrome, enable **Allow access to file URLs**, then reload the PDF tab before converting. Chrome blocks local files from extensions until that toggle is enabled.
 
 ## Important Loading Note
 
@@ -88,7 +88,8 @@ The repository includes:
 
 - **Failed to load extension / missing popup**: load `dist`, not the project root.
 - **CSP errors mentioning `blob:` or `new Function`**: rebuild with `npm run package`; the current build script removes those incompatible runtime paths.
-- **Cannot read local PDFs**: enable **Allow access to file URLs** for the extension in `chrome://extensions`.
+- **Cannot read local PDFs / stuck at 0%**: open `chrome://extensions`, open this extension's details, enable **Allow access to file URLs**, reload the PDF tab, then convert again. The extension now checks this before starting so blocked local files show a clear error.
+- **Rendering stays on one page**: retry at `1x` scale first. If Chrome or pdf.js cannot finish a page render, the job times out and reports which page got stuck.
 - **Very large PDFs are slow in ZIP mode**: use non-ZIP mode for lower memory use because pages can be downloaded one at a time.
 
 ## Privacy

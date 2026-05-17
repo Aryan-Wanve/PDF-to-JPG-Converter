@@ -2,7 +2,7 @@
 
 ## Local Files
 
-Chrome requires users to enable **Allow access to file URLs** before extensions can read `file://` PDFs. The popup surfaces a clear error if Chrome blocks access.
+Chrome requires users to enable **Allow access to file URLs** before extensions can read `file://` PDFs. The background worker checks this before starting and the offscreen renderer reports a direct local-file access error if Chrome still blocks the read. After changing the toggle, reload the PDF tab before converting.
 
 ## Protected Or Authenticated PDFs
 
@@ -15,6 +15,8 @@ If Chrome exposes the original PDF in a viewer `file` query parameter, the exten
 ## Large PDFs
 
 Pages are rendered sequentially. Each page canvas is cleared after encoding, and pdf.js page resources are cleaned up after every page.
+
+Each page render has a timeout so a damaged, massive, or browser-blocked page cannot leave the popup stuck forever at the same progress value. Retrying at `1x` scale is the safest fallback for unusually heavy PDFs.
 
 ## ZIP Mode
 

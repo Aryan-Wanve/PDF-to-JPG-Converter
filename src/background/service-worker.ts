@@ -65,6 +65,8 @@ async function startConversion(message: StartConversionMessage): Promise<{ ok: t
   }
 
   const source = await getActivePdfSource();
+  await ensurePdfCanBeRead(source);
+
   const jobId = crypto.randomUUID();
   status = {
     ...IDLE_STATUS,
@@ -86,6 +88,28 @@ async function startConversion(message: StartConversionMessage): Promise<{ ok: t
   });
 
   return { ok: true, status };
+}
+
+async function ensurePdfCanBeRead(source: PdfSource): Promise<void> {
+  if (!source.url.startsWith("file:")) return;
+
+  const allowed = await isAllowedFileSchemeAccess();
+  if (allowed) return;
+
+  throw new Error(
+    "Chrome is blocking this local PDF. Open chrome://extensions, open PDF to JPG Converter details, enable Allow access to file URLs, reload the PDF tab, and convert again."
+  );
+}
+
+function isAllowedFileSchemeAccess(): Promise<boolean> {
+  return new Promise((resolve) => {
+    const extensionApi = chrome.extension;
+    if (!extensionApi?.isAllowedFileSchemeAccess) {
+      resolve(false);
+      return;
+    }
+    extensionApi.isAllowedFileSchemeAccess((isAllowed) => resolve(isAllowed));
+  });
 }
 
 async function getActivePdfSource(): Promise<PdfSource> {
