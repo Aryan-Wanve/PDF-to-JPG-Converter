@@ -34,13 +34,19 @@ async function convertPdf(message: OffscreenStartMessage): Promise<void> {
     const pdfBytes = await fetchPdfBytes(source.url);
     ensureNotCancelled(jobId);
 
-    pdf = await pdfjsLib.getDocument({ data: pdfBytes, useWorkerFetch: false, isEvalSupported: false }).promise;
+    pdf = await pdfjsLib.getDocument({
+      data: pdfBytes,
+      useWorkerFetch: false,
+      isEvalSupported: false,
+      isOffscreenCanvasSupported: false,
+      isImageDecoderSupported: false
+    }).promise;
     const totalPages = pdf.numPages;
     const zipEntries: ZipEntry[] | null = settings.zipMode ? [] : null;
 
     for (let pageNumber = 1; pageNumber <= totalPages; pageNumber += 1) {
       ensureNotCancelled(jobId);
-      postProgress(jobId, "rendering", pageNumber - 1, totalPages, startedAt);
+      postProgress(jobId, "rendering", pageNumber, totalPages, startedAt);
 
       const jpgDataUrl = await renderPageToJpg(pdf, pageNumber, settings.scale, settings.quality / 100);
       const jpgName = pageFilename(pageNumber);
@@ -59,7 +65,6 @@ async function convertPdf(message: OffscreenStartMessage): Promise<void> {
         });
       }
 
-      postProgress(jobId, "rendering", pageNumber, totalPages, startedAt);
       await yieldToBrowser();
     }
 
@@ -134,11 +139,7 @@ async function renderPageToJpg(
   const page = await pdf.getPage(pageNumber);
   const viewport = page.getViewport({ scale });
 
-  const canvas =
-    typeof OffscreenCanvas !== "undefined"
-      ? new OffscreenCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height))
-      : document.createElement("canvas");
-
+  const canvas = document.createElement("canvas");
   canvas.width = Math.ceil(viewport.width);
   canvas.height = Math.ceil(viewport.height);
 
@@ -165,10 +166,7 @@ async function renderPageToJpg(
   }
 
 
-  const blob =
-    canvas instanceof OffscreenCanvas
-      ? await canvas.convertToBlob({ type: "image/jpeg", quality })
-      : await htmlCanvasToBlob(canvas, quality);
+  const blob = await htmlCanvasToBlob(canvas, quality);
 
   canvas.width = 0;
   canvas.height = 0;
